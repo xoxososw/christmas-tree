@@ -35,8 +35,8 @@ export const Interface: React.FC<InterfaceProps> = ({
     if (!audioRef.current) {
         setIsLoadingMusic(true);
         // Using a reliable MP3 source (Creative Commons Piano Christmas)
-        // REPLACE THE URL BELOW with your "Miracles in December.mp3" link
-        audioRef.current = new Audio('./3311088699.aac'); 
+        // Replace with your own hosted MP3 if needed
+        audioRef.current = new Audio('/3311088699.aac');
         audioRef.current.loop = true;
         audioRef.current.volume = 0.8;
         
