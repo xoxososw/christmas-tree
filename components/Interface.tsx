@@ -31,62 +31,87 @@ export const Interface: React.FC<InterfaceProps> = ({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize Audio Object Helper
-  const setupAudio = (url: string) => {
-      if (audioRef.current) {
-          audioRef.current.pause();
-          audioRef.current.src = url;
-      } else {
-          audioRef.current = new Audio(url);
-          audioRef.current.loop = true;
-          audioRef.current.volume = 0.8;
-          
-          audioRef.current.addEventListener('canplaythrough', () => {
-            setIsLoadingMusic(false);
-            // Auto play when ready (if it was a user action)
-            audioRef.current?.play().then(() => setIsPlaying(true)).catch(console.error);
-          });
-          
-          audioRef.current.addEventListener('error', (e) => {
-              console.error("Audio Error", e);
-              setIsLoadingMusic(false);
-              setIsPlaying(false);
-          });
-      }
-      
-      setIsLoadingMusic(true);
-      audioRef.current.load();
+  // Helper to construct correct path based on environment
+  const getAudioUrl = (filename: string) => {
+      // @ts-ignore
+      const baseUrl = import.meta.env.BASE_URL;
+      // Handle cases where baseUrl might be '/' or '/repo-name/'
+      const safeBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+      return `${safeBase}${filename}`;
   };
 
-  // 1. Toggle Play/Pause (Default or Current)
+  // 1. Toggle Play/Pause
   const toggleMusic = () => {
+    // A. Initialize if not exists
     if (!audioRef.current) {
-        // [修改]: 使用 import.meta.env.BASE_URL 自动拼接 GitHub 项目路径
-        // Vite 会自动根据 vite.config.ts 中的 base 配置来替换这个变量
-        const baseUrl = (import.meta as any).env.BASE_URL;
-        // 确保 baseUrl 以 / 结尾，如果不是空字符串的话
-        const safeBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+        setIsLoadingMusic(true);
         
-        // 指向 public 文件夹下的文件
-        setupAudio(`${safeBase}3311088699.mp3`); 
+        // Construct URL
+        const audioUrl = getAudioUrl('3311088699.mp3');
+        console.log("Attempting to play audio from:", audioUrl);
+
+        const audio = new Audio(audioUrl);
+        audio.loop = true;
+        audio.volume = 0.8;
+        
+        // Assign ref immediately
+        audioRef.current = audio;
+
+        // Try playing IMMEDIATELY (Don't wait for events, helps with browser autoplay policies)
+        audio.play()
+            .then(() => {
+                console.log("Audio started successfully");
+                setIsPlaying(true);
+                setIsLoadingMusic(false);
+            })
+            .catch((e) => {
+                console.error("Audio playback failed:", e);
+                setIsLoadingMusic(false);
+                setIsPlaying(false);
+                alert(`Cannot play music. Path: ${audioUrl}. Error: ${e.message}`);
+                // If failed, reset ref so user can try again
+                audioRef.current = null;
+            });
+
         return;
     }
 
+    // B. Toggle existing
     if (isPlaying) {
         audioRef.current.pause();
         setIsPlaying(false);
     } else {
-        audioRef.current.play().catch(e => console.error("Play failed:", e));
-        setIsPlaying(true);
+        audioRef.current.play()
+            .then(() => setIsPlaying(true))
+            .catch(e => console.error("Resume failed:", e));
     }
   };
 
-  // 2. Handle Local File Selection
+  // 2. Handle Local File Selection (Override)
   const handleMusicSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
       if (e.target.files && e.target.files.length > 0) {
           const file = e.target.files[0];
           const objectUrl = URL.createObjectURL(file);
-          setupAudio(objectUrl);
+          
+          if (audioRef.current) {
+              audioRef.current.pause();
+              audioRef.current.src = objectUrl;
+          } else {
+              audioRef.current = new Audio(objectUrl);
+              audioRef.current.loop = true;
+              audioRef.current.volume = 0.8;
+          }
+          
+          setIsLoadingMusic(true);
+          audioRef.current.play()
+            .then(() => {
+                setIsPlaying(true);
+                setIsLoadingMusic(false);
+            })
+            .catch(e => {
+                console.error("Local file play error", e);
+                setIsLoadingMusic(false);
+            });
       }
   };
 
