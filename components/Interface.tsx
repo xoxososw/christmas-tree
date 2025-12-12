@@ -29,30 +29,47 @@ export const Interface: React.FC<InterfaceProps> = ({
   const requestRef = useRef<number>(0);
   const modelRef = useRef<handpose.HandPose | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
 
-  // Music Logic
+  // Initialize Audio Object Helper
+  const setupAudio = (url: string) => {
+      if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current.src = url;
+      } else {
+          audioRef.current = new Audio(url);
+          audioRef.current.loop = true;
+          audioRef.current.volume = 0.8;
+          
+          audioRef.current.addEventListener('canplaythrough', () => {
+            setIsLoadingMusic(false);
+            // Auto play when ready (if it was a user action)
+            audioRef.current?.play().then(() => setIsPlaying(true)).catch(console.error);
+          });
+          
+          audioRef.current.addEventListener('error', (e) => {
+              console.error("Audio Error", e);
+              setIsLoadingMusic(false);
+              setIsPlaying(false);
+          });
+      }
+      
+      setIsLoadingMusic(true);
+      audioRef.current.load();
+  };
+
+  // 1. Toggle Play/Pause (Default or Current)
   const toggleMusic = () => {
     if (!audioRef.current) {
-        setIsLoadingMusic(true);
-        // Using a reliable MP3 source (Creative Commons Piano Christmas)
-        // Replace with your own hosted MP3 if needed
-        audioRef.current = new Audio('/3311088699.mp3');
-        audioRef.current.loop = true;
-        audioRef.current.volume = 0.8;
+        // [修改]: 使用 import.meta.env.BASE_URL 自动拼接 GitHub 项目路径
+        // Vite 会自动根据 vite.config.ts 中的 base 配置来替换这个变量
+        const baseUrl = (import.meta as any).env.BASE_URL;
+        // 确保 baseUrl 以 / 结尾，如果不是空字符串的话
+        const safeBase = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
         
-        // Listen for when it's ready to play
-        audioRef.current.addEventListener('canplaythrough', () => {
-            setIsLoadingMusic(false);
-            if (audioRef.current) {
-               audioRef.current.play().then(() => setIsPlaying(true)).catch(e => {
-                   console.error("Autoplay prevented:", e);
-                   setIsPlaying(false);
-               });
-            }
-        });
-
-        audioRef.current.load();
-        return; // Wait for load
+        // 指向 public 文件夹下的文件
+        setupAudio(`${safeBase}3311088699.mp3`); 
+        return;
     }
 
     if (isPlaying) {
@@ -62,6 +79,15 @@ export const Interface: React.FC<InterfaceProps> = ({
         audioRef.current.play().catch(e => console.error("Play failed:", e));
         setIsPlaying(true);
     }
+  };
+
+  // 2. Handle Local File Selection
+  const handleMusicSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+          const file = e.target.files[0];
+          const objectUrl = URL.createObjectURL(file);
+          setupAudio(objectUrl);
+      }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,12 +196,33 @@ export const Interface: React.FC<InterfaceProps> = ({
     <div className="absolute inset-0 pointer-events-none flex flex-col justify-between p-6 z-10">
       
       {/* Header Removed - Buttons Only */}
-      <div className="flex w-full justify-end items-start pointer-events-auto gap-4">
-        {/* Music Button */}
+      <div className="flex w-full justify-end items-start pointer-events-auto gap-3">
+        
+        {/* === NEW: Custom Music Upload === */}
+        <input 
+            type="file" 
+            accept="audio/*" 
+            ref={musicInputRef} 
+            className="hidden" 
+            onChange={handleMusicSelect} 
+        />
+        <button 
+            onClick={() => musicInputRef.current?.click()}
+            className="px-3 py-3 rounded border border-yellow-800 bg-black/60 text-yellow-500 hover:bg-yellow-900/30 transition-all flex items-center gap-2"
+            title="Upload Local MP3"
+        >
+             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <span className="hidden md:inline">Custom Song</span>
+        </button>
+
+        {/* Play/Pause Button */}
         <button 
             onClick={toggleMusic}
             disabled={isLoadingMusic}
-            className={`px-4 py-3 rounded border transition-all flex items-center gap-2 
+            className={`px-4 py-3 rounded border transition-all flex items-center gap-2 min-w-[140px] justify-center
               ${isPlaying 
                   ? 'bg-yellow-600/80 text-white border-white animate-pulse' 
                   : 'bg-black/50 text-yellow-500 border-yellow-600'
@@ -183,12 +230,24 @@ export const Interface: React.FC<InterfaceProps> = ({
               ${isLoadingMusic ? 'opacity-50 cursor-not-allowed' : ''}
             `}
         >
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
-            </svg>
-            <span>
-                {isLoadingMusic ? 'Loading...' : (isPlaying ? 'Music Playing' : 'Play Music')}
-            </span>
+            {isLoadingMusic ? (
+                 <span>Loading...</span>
+            ) : isPlaying ? (
+                 <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Playing</span>
+                 </>
+            ) : (
+                 <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span>Play Music</span>
+                 </>
+            )}
         </button>
 
         <label className="cursor-pointer group">
@@ -197,7 +256,8 @@ export const Interface: React.FC<InterfaceProps> = ({
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                <span>Add Memories</span>
+                <span className="hidden md:inline">Add Memories</span>
+                <span className="md:hidden">Add</span>
             </div>
         </label>
 
@@ -208,7 +268,8 @@ export const Interface: React.FC<InterfaceProps> = ({
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
             </svg>
-            {showCamera ? 'Disable Gestures' : 'Enable Gestures'}
+            <span className="hidden md:inline">{showCamera ? 'Disable Gestures' : 'Enable Gestures'}</span>
+            <span className="md:hidden">Cam</span>
         </button>
       </div>
 
