@@ -36,7 +36,7 @@ export const Interface: React.FC<InterfaceProps> = ({
         setIsLoadingMusic(true);
         // Using a reliable MP3 source (Creative Commons Piano Christmas)
         // Replace with your own hosted MP3 if needed
-        audioRef.current = new Audio('/3311088699.aac');
+        audioRef.current = new Audio('/3311088699.mp3');
         audioRef.current.loop = true;
         audioRef.current.volume = 0.8;
         
